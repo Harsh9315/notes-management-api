@@ -1,96 +1,59 @@
-const noteForm = document.getElementById('noteForm');
-const noteDateInput = document.getElementById('noteDate');
-const noteTextInput = document.getElementById('noteText');
-const notesListContainer = document.getElementById('notesList');
-const filterDateInput = document.getElementById('filterDate');
-const btnClearFilter = document.getElementById('btnClearFilter');
+document.addEventListener('DOMContentLoaded', () => {
+    const noteForm = document.getElementById('noteForm');
+    const notesList = document.getElementById('notesList');
+    const filterDate = document.getElementById('filterDate');
+    const btnClearFilter = document.getElementById('btnClearFilter');
 
-
-
-let allNotes = [];
-
-async function fetchNotes() {
-    const response = await fetch('/api/notes');
-    allNotes = await response.json();
-    applyFilterAndRender();
-}
-
-function applyFilterAndRender() {
-    const filterValue = filterDateInput.value;
-    let filteredNotes = allNotes;
-
-    if (filterValue) {
-        filteredNotes = allNotes.filter(note => note.date === filterValue);
+    async function fetchNotes(dateFilter = '') {
+        try {
+            const url = dateFilter ? `/api/notes?date=${dateFilter}` : '/api/notes';
+            const response = await fetch(url);
+            const notes = await response.json();
+            
+            notesList.innerHTML = notes.length === 0 ? '<p class="no-notes">No notes available.</p>' : '';
+            
+            notes.forEach(note => {
+                const div = document.createElement('div');
+                div.className = 'note-card';
+                div.innerHTML = `
+                    <h3>${note.title}</h3>
+                    <small>${note.date}</small>
+                    <p>${note.content}</p>
+                    <button onclick="deleteNote('${note._id}')" class="btn-delete">Delete</button>
+                `;
+                notesList.appendChild(div);
+            });
+        } catch (err) {
+            console.error(err);
+        }
     }
 
-    renderNotes(filteredNotes);
-}
-
-function renderNotes(notes) {
-    notesListContainer.innerHTML = '';
-
-    if (notes.length === 0) {
-        notesListContainer.innerHTML = '<p class="no-notes">No entries found. Your logs will appear here.</p>';
-        return;
-    }
-
-    notes.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    notes.forEach(note => {
-        const noteElement = document.createElement('div');
-        noteElement.classList.add('note-item');
-        
-        const formattedDate = new Date(note.date).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
+    noteForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const noteData = {
+            date: document.getElementById('noteDate').value,
+            title: document.getElementById('noteTitle').value,
+            content: document.getElementById('noteText').value
+        };
+        await fetch('/api/notes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(noteData)
         });
-
-        noteElement.innerHTML = `
-            <div class="note-content">
-                <span class="note-date">${formattedDate}</span>
-                <p style="white-space: pre-wrap;">${note.text}</p>
-            </div>
-            <button class="btn-delete" onclick="deleteNote('${note.id}')">Delete</button>
-        `;
-        
-        notesListContainer.appendChild(noteElement);
-    });
-}
-
-filterDateInput.addEventListener('input', applyFilterAndRender);
-
-btnClearFilter.addEventListener('click', () => {
-    filterDateInput.value = '';
-    applyFilterAndRender();
-});
-
-noteForm.addEventListener('submit', async function(event) {
-    event.preventDefault();
-
-    const response = await fetch('/api/notes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            date: noteDateInput.value,
-            text: noteTextInput.value
-        })
-    });
-
-    if (response.ok) {
-        noteTextInput.value = '';
+        noteForm.reset();
         fetchNotes();
-    }
-});
-
-async function deleteNote(noteId) {
-    const response = await fetch(`/api/notes/${noteId}`, {
-        method: 'DELETE'
     });
 
-    if (response.ok) {
+    filterDate.addEventListener('change', (e) => fetchNotes(e.target.value));
+    btnClearFilter.addEventListener('click', () => {
+        filterDate.value = '';
         fetchNotes();
-    }
-}
+    });
 
-fetchNotes();
+    window.deleteNote = async (id) => {
+        await fetch(`/api/notes/${id}`, { method: 'DELETE' });
+        fetchNotes();
+    };
+
+    fetchNotes();
+});
