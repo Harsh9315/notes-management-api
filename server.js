@@ -1,40 +1,38 @@
 const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
 const path = require('path');
-const app = express();
-const PORT = 3000;
 
+const app = express();
 app.use(express.json());
+app.use(cors());
 app.use(express.static(path.join(__dirname, 'public')));
 
-let notesDatabase = [];
+mongoose.connect("mongodb+srv://harshsrivastav9315633_db_user:e8bCsHHnOJEwgPBm@cluster0.yjhovgu.mongodb.net/?appName=Cluster0");
 
-app.get('/api/notes', (req, res) => {
-    res.json(notesDatabase);
+const Note = mongoose.model('Note', new mongoose.Schema({
+    date: String,
+    title: String,
+    content: String
+}));
+
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+
+app.get('/api/notes', async (req, res) => {
+    const query = req.query.date ? { date: req.query.date } : {};
+    const notes = await Note.find(query);
+    res.json(notes);
 });
 
-app.post('/api/notes', (req, res) => {
-    const { date, text } = req.body;
-    
-    if (!date || !text) {
-        return res.status(400).json({ error: "Date and Text are required" });
-    }
-
-    const newNote = {
-        id: Date.now().toString(),
-        date,
-        text
-    };
-
-    notesDatabase.push(newNote);
+app.post('/api/notes', async (req, res) => {
+    const newNote = new Note(req.body);
+    await newNote.save();
     res.status(201).json(newNote);
 });
 
-app.delete('/api/notes/:id', (req, res) => {
-    const { id } = req.params;
-    notesDatabase = notesDatabase.filter(note => note.id !== id);
-    res.json({ message: "Note deleted successfully" });
+app.delete('/api/notes/:id', async (req, res) => {
+    await Note.findByIdAndDelete(req.params.id);
+    res.json({ message: "Deleted" });
 });
 
-app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-});
+app.listen(3000, () => console.log("Server running on http://localhost:3000"));
